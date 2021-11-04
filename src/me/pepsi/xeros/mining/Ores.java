@@ -10,17 +10,18 @@ public enum Ores {
 	GEM("Gem", 9030),
 	MITHRIL("Mithril", 11373),
 	ADAMANTITE("Adamantite", 11375),
-	RUNITE("Runite", 11376);
+	RUNITE("Runite", 11376),
+	AMETHYST("Amethyst", -2);
 	
 	private final String name;
-	private final int[] objectId;
+	private final int objectId;
 	
-	Ores(final String name, final int... objectId) {
+	Ores(final String name, final int objectId) {
 		this.name = name;
 		this.objectId = objectId;
 	}
 
-	public int[] getObjectId() {
+	public int getObjectId() {
 		return objectId;
 	}
 	

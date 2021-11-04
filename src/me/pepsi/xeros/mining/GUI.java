@@ -2,8 +2,6 @@ package me.pepsi.xeros.mining;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.ArrayList;
-import java.util.List;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
@@ -103,24 +101,8 @@ public class GUI {
 	}
 	
 	public void onApplyNewSettings() {
-		List<Integer> npcIdList = new ArrayList<Integer>();
-		for (Object npc : modelSelectedMonsters.toArray()) {
-			if (!(npc instanceof String)) {
-				continue;
-			}
-			String npcInfo = (String) npc;
-			npcIdList.add(Integer.valueOf(npcInfo.split(",")[2].replace(" ", "").replace("]", "")));
-		}
-		int[] npcIds = new int[npcIdList.size()];
-		for (int i = 0; i < npcIds.length; i++) {
-			npcIds[i] = npcIdList.get(i);
-		}
 		Ores oreType = (Ores) comboBoxOres.getSelectedItem();
-		if (oreType == Ores.NONE) {
-			mine.setupOres(null);
-		} else {
-			mine.setupOres(oreType.getObjectId());
-		}
+		mine.setupOres(oreType.getObjectId());
 		mine.started = true;
 	}
 	

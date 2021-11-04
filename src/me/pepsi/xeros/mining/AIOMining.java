@@ -1,32 +1,38 @@
 package me.pepsi.xeros.mining;
 
-import simple.api.script.Category;
-import simple.api.script.ScriptManifest;
-import simple.api.script.interfaces.SimplePaintable;
-import simple.api.wrappers.SimpleGameObject;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics2D;
+import javax.swing.SwingUtilities;
+
+import simple.api.actions.SimpleItemActions;
 import simple.api.actions.SimpleObjectActions;
 import simple.api.coords.WorldArea;
 import simple.api.coords.WorldPoint;
 import simple.api.events.ChatMessageEvent;
 import simple.api.filters.SimpleSkills;
 import simple.api.listeners.SimpleMessageListener;
+import simple.api.script.Category;
 import simple.api.script.Script;
+import simple.api.script.ScriptManifest;
+import simple.api.script.interfaces.SimplePaintable;
+import simple.api.wrappers.SimpleGameObject;
+import simple.api.wrappers.SimpleGroundObject;
+import simple.api.wrappers.SimpleItem;
 
-import java.awt.*;
 
-import javax.swing.SwingUtilities;
-
-
-@ScriptManifest(author = "Pepsiplaya", name = "AIO Mining", category = Category.MINING, version = "1.2D",
+@ScriptManifest(author = "Pepsiplaya", name = "AIO Mining", category = Category.MINING, version = "1.4D",
         description = "Mining On Skilling Island Till 99. Make sure to have a pickaxe equipped", discord = "Pepsiplaya#6988", servers = { "Xeros" })
 
 public class AIOMining extends Script implements SimplePaintable, SimpleMessageListener {
 	
     public String status;
     public boolean started;
+    public boolean full = false;
     private long startExp;
     public long startTime;
-    public int[] oreId;
+    public int oreId;
     private long lastAnimation = -1;
     
     public static final WorldArea HOME_AREA = new WorldArea(
@@ -36,6 +42,10 @@ public class AIOMining extends Script implements SimplePaintable, SimpleMessageL
     public static final WorldArea SKILLING_AREA = new WorldArea(
             new WorldPoint(3700, 3400, 0),
             new WorldPoint(3900, 3600, 0));
+    
+    public static final WorldArea AMETHYST_MINE = new WorldArea(
+            new WorldPoint(3000, 9690, 0),
+            new WorldPoint(3030, 9730, 0));
     
     public GUI gui;
     
@@ -58,45 +68,99 @@ public class AIOMining extends Script implements SimplePaintable, SimpleMessageL
     }
     
     void bank() {
-		SimpleGameObject bank = (SimpleGameObject) ctx.objects.populate().filter(20325).nearest().next();
-		SimpleGameObject ore = (SimpleGameObject) ctx.objects.populate().filter(oreId).nearest().next();
-		
-		if (bank != null) {
-			bank.interact(SimpleObjectActions.FIRST);
-			status = "Banking";
-			ctx.onCondition(() -> ctx.bank.bankOpen(), 10000);
-			ctx.bank.depositAllExcept("pickaxe");
-			ctx.sleep(1000);
+    	SimpleGameObject bank = (SimpleGameObject) ctx.objects.populate().filter(20325).nearest().next();
+    	status = "Sleeping";
+		ctx.sleep(750, 1500);
+    	status = "Banking";
+		if (!ctx.bank.bankOpen() && bank != null) {
+			bank.interact(SimpleObjectActions.USE);
+			ctx.onCondition(() -> ctx.bank.bankOpen(), 250, 30);
 		}
-		
-		if (ore != null) { 
-			status = "Mining";
-			ore.interact("Mine");
-			ctx.onCondition(() -> !ctx.players.getLocal().isAnimating(), 250, 10);
+		ctx.bank.depositAllExcept("pickaxe");
+		ctx.sleep(500);
+		ctx.bank.closeBank();
+		ctx.onCondition(() -> ctx.bank.closeBank(), 250, 4);
+		full = false;
+	}
+    
+    void amethystBank() {
+		SimpleGameObject bank = (SimpleGameObject) ctx.objects.populate().filter(4483).nearest().next();
+		status = "Banking";
+		if (!ctx.bank.bankOpen() && bank != null) {
+			bank.interact(SimpleObjectActions.USE);
+			ctx.onCondition(() -> ctx.bank.bankOpen(), 250, 30);
 		}
+		if (ctx.inventory.populate().filter(1755).isEmpty()) {
+			ctx.bank.withdraw(1755, 1);
+			ctx.onCondition(() -> !ctx.inventory.populate().filter(1755).isEmpty(), 250, 4);
+		}
+		ctx.bank.depositAllExcept(1755);
+		ctx.sleep(500);
+		ctx.bank.closeBank();
+		ctx.onCondition(() -> ctx.bank.closeBank(), 250, 4);
+		full = false;
 	}
 
     @Override
     public void onProcess() {
-    	
-    	if (!SKILLING_AREA.containsPoint(ctx.players.getLocal())) {
+    	if (oreId == -1) {
     		return;
-        }
-    	
+    	}
     	if (ctx.players.getLocal().isAnimating()) {
     		lastAnimation = System.currentTimeMillis();
     	}
-
-    	if (SKILLING_AREA.containsPoint(ctx.players.getLocal())) {
-            if (ctx.inventory.inventoryFull()) {
-            	bank();
+		if ((!ctx.equipment.populate().filter("Dragon pickaxe").isEmpty() || !ctx.equipment.populate().filter("Infernal pickaxe").isEmpty()) && ctx.combat.getSpecialAttackPercentage() >= 100) {
+			ctx.combat.toggleSpecialAttack(true);
+		}
+    	if (oreId == -2 && AMETHYST_MINE.containsPoint(ctx.players.getLocal())) {
+    		int amethystCount = ctx.inventory.populate().filter(21347).population();
+        	SimpleGroundObject ore = (SimpleGroundObject) ctx.objects.populate().filter("Crystals").nearest().next();
+    		if (ctx.inventory.inventoryFull() && amethystCount <= 15) {
+    			amethystBank();
+    		}
+        	if (ctx.inventory.populate().filter(1755).isEmpty()) {
+        		amethystBank();
+        	}
+        	if (ctx.players.getLocal().isAnimating()) {
+        		lastAnimation = System.currentTimeMillis();
+        	}
+            if (ctx.dialogue.dialogueOpen() || full) {
+            	status = "Chiseling";
+            	SimpleItem chisel = ctx.inventory.populate().filter(1755).next();
+            	SimpleItem amethyst = ctx.inventory.populate().filter(21347).peekNext();
+            	if (amethyst != null) {
+            		amethyst.interact(SimpleItemActions.USE_WITH);
+            		chisel.interact(SimpleItemActions.USE);
+            		lastAnimation = System.currentTimeMillis();
+            		return;
+            	}
             }
+            if (!ctx.players.getLocal().isAnimating() && !ctx.inventory.inventoryFull() && System.currentTimeMillis() > (lastAnimation + 2000)) {
+                if (ore != null) { 
+                	status = "Sleeping";
+            		ctx.sleep(750, 1500);
+                	status = "Mining";
+                	ore.interact("Mine");
+                	ctx.onCondition(() -> ctx.players.getLocal().isAnimating(), 250, 10);
+                	lastAnimation = System.currentTimeMillis();
+                	full = false;
+                }
+            }
+    	}
+    	if (SKILLING_AREA.containsPoint(ctx.players.getLocal())) {
+        	if (full || ctx.inventory.inventoryFull()) {
+        		bank();
+        	}
             SimpleGameObject ore = (SimpleGameObject) ctx.objects.populate().filter(oreId).nearest().next();
-            if (!ctx.players.getLocal().isAnimating() && !ctx.inventory.inventoryFull() && System.currentTimeMillis() > (lastAnimation + 3000)) {
+            if (!ctx.players.getLocal().isAnimating() && !ctx.inventory.inventoryFull() && System.currentTimeMillis() > (lastAnimation + 2000)) {
             	if (ore != null) { 
+            		status = "Sleeping";
+            		ctx.sleep(750, 1500);
             		status = "Mining";
             		ore.interact("Mine");
             		ctx.onCondition(() -> !ctx.players.getLocal().isAnimating(), 250, 10);
+            		lastAnimation = System.currentTimeMillis();
+            		full = false;
                 }
             }
         }
@@ -144,10 +208,14 @@ public class AIOMining extends Script implements SimplePaintable, SimpleMessageL
     }
 	
     public void onChatMessage(ChatMessageEvent event) {
-    	
+    	if (event.getMessageType() == 0 && event.getSender().equals("")) {
+			if (event.getMessage().contains("You have run out of inventory space.")) {
+				full = true;
+			}
+		}
     }
 
-    public void setupOres(int[] oreId) {
+    public void setupOres(int oreId) {
         this.oreId = oreId;
     }
 }
