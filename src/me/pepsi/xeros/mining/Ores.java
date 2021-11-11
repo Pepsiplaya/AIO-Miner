@@ -3,6 +3,7 @@ package me.pepsi.xeros.mining;
 public enum Ores {
 	
 	NONE("", -1),
+	RUNE_ESSENCE("Rune_Essence", 2005),
 	TIN("Tin", 11360),
 	COPPER("Copper", 11161),
 	IRON("Iron", 11364),
